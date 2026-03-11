@@ -1,1 +1,398 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Building2, 
+  Leaf, 
+  Zap, 
+  Coins, 
+  Truck, 
+  Hammer, 
+  Recycle, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Info,
+  ChevronRight,
+  RefreshCcw,
+  Trophy
+} from 'lucide-react';
 
+const STAGES = {
+  START: 'START',
+  DESIGN: 'DESIGN',
+  CONSTRUCTION: 'CONSTRUCTION',
+  OPERATION: 'OPERATION',
+  END_OF_LIFE: 'END_OF_LIFE',
+  RESULTS: 'RESULTS'
+};
+
+const OPTIONS = {
+  DESIGN: [
+    {
+      id: 'concrete',
+      name: 'Reinforced Concrete',
+      description: 'The industry standard. Strong and cheap, but has a massive carbon footprint from cement production.',
+      cost: 150000,
+      embodied: 500000,
+      opsFactor: 1.0,
+      icon: '🏗️'
+    },
+    {
+      id: 'steel',
+      name: 'Recycled Steel',
+      description: 'Strong and modern. Moderate cost and carbon. Highly durable for high-rise structures.',
+      cost: 250000,
+      embodied: 250000,
+      opsFactor: 0.9,
+      icon: '🏙️'
+    },
+    {
+      id: 'timber',
+      name: 'Cross-Laminated Timber',
+      description: 'The "Green" choice. It stores carbon (sequestration), but sourcing it sustainably is expensive.',
+      cost: 400000,
+      embodied: -50000,
+      opsFactor: 0.8,
+      icon: '🌲'
+    }
+  ],
+  CONSTRUCTION: [
+    {
+      id: 'standard',
+      name: 'Standard Diesel Site',
+      description: 'Fast and cheap machinery. High site emissions and noise for neighbors.',
+      cost: 50000,
+      embodied: 40000,
+      icon: '🚜'
+    },
+    {
+      id: 'electric',
+      name: 'Electric & Local',
+      description: 'Electric cranes and local materials. High setup cost but minimizes transport carbon.',
+      cost: 120000,
+      embodied: 5000,
+      icon: '🔌'
+    }
+  ],
+  OPERATION: [
+    {
+      id: 'basic',
+      name: 'Code Minimum',
+      description: 'Single glazing and standard boiler. Saves money now, but utility bills will be sky-high.',
+      cost: 30000,
+      opsAnnual: 15000,
+      icon: '🔥'
+    },
+    {
+      id: 'passive',
+      name: 'Passive House Standard',
+      description: 'Triple glazing, air-tight seal, and solar panels. Drastically reduces energy needs.',
+      cost: 180000,
+      opsAnnual: 1200,
+      icon: '☀️'
+    }
+  ],
+  END_OF_LIFE: [
+    {
+      id: 'demo',
+      name: 'Conventional Demolition',
+      description: 'Fast and profitable. Everything goes to a landfill. No material recovery.',
+      cost: 10000,
+      recovery: 0,
+      icon: '💣'
+    },
+    {
+      id: 'disassembly',
+      name: 'Design for Disassembly',
+      description: 'Slow and careful. We recover 80% of materials for future buildings.',
+      cost: 60000,
+      recovery: 0.8,
+      icon: '♻️'
+    }
+  ]
+};
+
+const App = () => {
+  const [stage, setStage] = useState(STAGES.START);
+  const [budget, setBudget] = useState(1000000);
+  const [embodiedCarbon, setEmbodiedCarbon] = useState(0);
+  const [opsCarbonAnnual, setOpsCarbonAnnual] = useState(0);
+  const [choices, setChoices] = useState({});
+  const [year, setYear] = useState(0);
+  const [log, setLog] = useState(["Welcome, Architect. Choose your path wisely."]);
+
+  const addLog = (msg) => setLog(prev => [msg, ...prev].slice(0, 5));
+
+  const handleChoice = (category, choice) => {
+    setChoices(prev => ({ ...prev, [category]: choice }));
+    setBudget(prev => prev - (choice.cost || 0));
+    setEmbodiedCarbon(prev => prev + (choice.embodied || 0));
+    if (choice.opsAnnual) setOpsCarbonAnnual(choice.opsAnnual);
+    
+    addLog(`Selected ${choice.name}.`);
+    
+    // Progress stage
+    if (category === 'DESIGN') setStage(STAGES.CONSTRUCTION);
+    if (category === 'CONSTRUCTION') setStage(STAGES.OPERATION);
+    if (category === 'OPERATION') setStage(STAGES.END_OF_LIFE);
+    if (category === 'END_OF_LIFE') setStage(STAGES.RESULTS);
+  };
+
+  const totalCarbon = useMemo(() => {
+    const lifecycleYears = 60;
+    const totalOps = opsCarbonAnnual * lifecycleYears;
+    let total = embodiedCarbon + totalOps;
+    if (choices.END_OF_LIFE?.recovery) {
+      total *= (1 - (choices.END_OF_LIFE.recovery * 0.3)); // Recovery reduces total footprint
+    }
+    return Math.round(total);
+  }, [embodiedCarbon, opsCarbonAnnual, choices]);
+
+  const getRank = () => {
+    if (totalCarbon < 100000) return { title: 'Net-Zero Hero', color: 'text-emerald-500', medal: '🥇' };
+    if (totalCarbon < 500000) return { title: 'Green Architect', color: 'text-blue-500', medal: '🥈' };
+    return { title: 'Carbon Heavyweight', color: 'text-orange-500', medal: '🥉' };
+  };
+
+  const restart = () => {
+    setStage(STAGES.START);
+    setBudget(1000000);
+    setEmbodiedCarbon(0);
+    setOpsCarbonAnnual(0);
+    setChoices({});
+    setLog(["Starting new project..."]);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 md:p-8 font-sans">
+      <div className="max-w-4xl mx-auto">
+        
+        {/* Header & Stats Bar */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Building2 className="text-blue-400" /> LCA Quest: Urban Architect
+            </h1>
+            <p className="text-slate-400 text-sm">Cradle-to-Grave Sustainability Simulator</p>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full md:w-auto">
+            <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700">
+              <div className="text-xs text-slate-400 flex items-center gap-1"><Coins size={12}/> Budget</div>
+              <div className={`font-mono font-bold ${budget < 100000 ? 'text-red-400' : 'text-emerald-400'}`}>
+                ${budget.toLocaleString()}
+              </div>
+            </div>
+            <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700">
+              <div className="text-xs text-slate-400 flex items-center gap-1"><Leaf size={12}/> Embodied C</div>
+              <div className="font-mono font-bold text-blue-300">
+                {embodiedCarbon.toLocaleString()} <span className="text-[10px]">kg</span>
+              </div>
+            </div>
+            <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700 col-span-2 md:col-span-1">
+              <div className="text-xs text-slate-400 flex items-center gap-1"><Zap size={12}/> Ops C / yr</div>
+              <div className="font-mono font-bold text-yellow-400">
+                {opsCarbonAnnual.toLocaleString()} <span className="text-[10px]">kg</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Main Interaction Area */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {stage === STAGES.START && (
+              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-2xl text-center space-y-6">
+                <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Building2 size={40} className="text-blue-400" />
+                </div>
+                <h2 className="text-3xl font-bold">New Project Assigned: EcoVale Hub</h2>
+                <p className="text-slate-400 leading-relaxed">
+                  You have been hired as both the **Lead Designer** and **Site Builder**. 
+                  The city demands a building with the lowest possible Life Cycle Assessment (LCA) score.
+                  You have $1,000,000 and a 60-year lifecycle to manage.
+                </p>
+                <button 
+                  onClick={() => setStage(STAGES.DESIGN)}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold transition-all flex items-center gap-2 mx-auto"
+                >
+                  Start Phase 1: Material Selection <ChevronRight size={20}/>
+                </button>
+              </div>
+            )}
+
+            {(stage === STAGES.DESIGN || stage === STAGES.CONSTRUCTION || stage === STAGES.OPERATION || stage === STAGES.END_OF_LIFE) && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center gap-2 text-blue-400 font-bold uppercase tracking-widest text-sm">
+                  <span className="bg-blue-500/20 px-2 py-1 rounded">Stage {Object.keys(STAGES).indexOf(stage)} / 4</span>
+                  <span>{stage.replace('_', ' ')}</span>
+                </div>
+                
+                <h2 className="text-2xl font-bold">
+                  {stage === STAGES.DESIGN && "Choose your Structural Frame"}
+                  {stage === STAGES.CONSTRUCTION && "Logistics & Site Setup"}
+                  {stage === STAGES.OPERATION && "HVAC & Energy Efficiency"}
+                  {stage === STAGES.END_OF_LIFE && "Decommissioning Plan"}
+                </h2>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {OPTIONS[stage].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => handleChoice(stage, opt)}
+                      disabled={budget < opt.cost}
+                      className={`group relative flex items-start gap-4 p-5 rounded-2xl border text-left transition-all ${
+                        budget < opt.cost 
+                          ? 'opacity-50 grayscale cursor-not-allowed border-slate-800' 
+                          : 'bg-slate-800 border-slate-700 hover:border-blue-500 hover:bg-slate-750 shadow-lg active:scale-[0.98]'
+                      }`}
+                    >
+                      <span className="text-4xl">{opt.icon}</span>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-1">
+                          <h3 className="font-bold text-lg">{opt.name}</h3>
+                          <span className="font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded text-sm">
+                            -${opt.cost.toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-400 mb-3">{opt.description}</p>
+                        <div className="flex gap-4 text-xs">
+                          {opt.embodied !== undefined && (
+                            <span className={`flex items-center gap-1 ${opt.embodied <= 0 ? 'text-emerald-400' : 'text-slate-300'}`}>
+                              <Leaf size={12}/> {opt.embodied.toLocaleString()} kg CO2e
+                            </span>
+                          )}
+                          {opt.opsAnnual !== undefined && (
+                            <span className="flex items-center gap-1 text-yellow-400">
+                              <Zap size={12}/> {opt.opsAnnual.toLocaleString()} kg/yr
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {budget < opt.cost && (
+                        <div className="absolute top-2 right-2 text-red-400 flex items-center gap-1 text-[10px] font-bold uppercase">
+                          <AlertTriangle size={12}/> Over Budget
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {stage === STAGES.RESULTS && (
+              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-2xl space-y-8 animate-in zoom-in-95 duration-700">
+                <div className="text-center space-y-2">
+                  <div className="text-6xl mb-4">{getRank().medal}</div>
+                  <h2 className={`text-4xl font-black ${getRank().color}`}>{getRank().title}</h2>
+                  <p className="text-slate-400">Project: {choices.DESIGN?.name} Eco-Hub</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700">
+                    <h4 className="text-sm uppercase text-slate-500 font-bold mb-4">Lifecycle Carbon Breakdown</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span>Embodied Carbon:</span>
+                        <span className="font-mono text-blue-300">{embodiedCarbon.toLocaleString()} kg</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Operational (60 yrs):</span>
+                        <span className="font-mono text-yellow-400">{(opsCarbonAnnual * 60).toLocaleString()} kg</span>
+                      </div>
+                      {choices.END_OF_LIFE?.recovery > 0 && (
+                        <div className="flex justify-between text-sm text-emerald-400">
+                          <span>Circular Recovery:</span>
+                          <span className="font-mono">-{Math.round(totalCarbon * 0.2).toLocaleString()} kg</span>
+                        </div>
+                      )}
+                      <div className="pt-3 border-t border-slate-700 flex justify-between font-bold text-lg">
+                        <span>Total LCA:</span>
+                        <span className="font-mono">{totalCarbon.toLocaleString()} kg CO2e</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700">
+                    <h4 className="text-sm uppercase text-slate-500 font-bold mb-4">Project Legacy</h4>
+                    <ul className="space-y-2 text-sm">
+                      <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-400"/> Budget used: ${ (1000000 - budget).toLocaleString() }</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-400"/> Build complexity: {choices.CONSTRUCTION?.name}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-400"/> End of life: {choices.END_OF_LIFE?.name}</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={restart}
+                  className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <RefreshCcw size={18}/> New Commission
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar: Dashboard & Logs */}
+          <div className="space-y-6">
+            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+              <h3 className="text-xs font-bold uppercase text-slate-500 mb-4 flex items-center gap-2">
+                <Info size={14}/> LCA Vision HUD
+              </h3>
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>Embodied Carbon Debt</span>
+                    <span className="text-blue-400">{Math.round((embodiedCarbon / 600000) * 100)}%</span>
+                  </div>
+                  <div className="h-2 bg-slate-900 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 transition-all duration-1000" 
+                      style={{ width: `${Math.min(100, (embodiedCarbon / 600000) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>Ops Energy Leakage</span>
+                    <span className="text-yellow-400">{Math.round((opsCarbonAnnual / 20000) * 100)}%</span>
+                  </div>
+                  <div className="h-2 bg-slate-900 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-yellow-500 transition-all duration-1000" 
+                      style={{ width: `${Math.min(100, (opsCarbonAnnual / 20000) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+              <h3 className="text-xs font-bold uppercase text-slate-500 mb-4 flex items-center gap-2">
+                <Hammer size={14}/> Activity Log
+              </h3>
+              <div className="space-y-3">
+                {log.map((entry, i) => (
+                  <div key={i} className={`text-sm py-2 border-b border-slate-700 last:border-0 ${i === 0 ? 'text-slate-100 font-medium' : 'text-slate-500'}`}>
+                    {entry}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-blue-900/20 p-4 rounded-xl border border-blue-500/30 text-xs text-blue-300 leading-relaxed italic">
+              "LCA is about looking at the building from 'Cradle to Grave'. Every choice today is a carbon debt for tomorrow."
+            </div>
+          </div>
+
+        </main>
+        
+        <footer className="mt-12 text-center text-slate-500 text-xs py-8">
+          © 2024 EcoVale Sustainability Initiative • Built with Lifecycle Principles
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+export default App;
